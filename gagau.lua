@@ -10,8 +10,8 @@ local TweenService = game:GetService("TweenService")
 
 local GaGauUpdate = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("GaGauUpdate")
 
--- ĐƯỜNG TRUYỀN LOCALTUNNEL TERMUX CỦA BẠN (GIỮ NGUYÊN KẾT CẤU)
-local AI_SERVER_URL = "https://silver-geckos-check.loca.lt/predict" 
+-- ĐƯỜNG TRUYỀN LOCALTUNNEL TERMUX MỚI CỦA BẠN (ĐÃ CẬP NHẬT CHUẨN)
+local AI_SERVER_URL = "https://grumpy-carpets-help.loca.lt/predict" 
 local AI_API_KEY = "HacTrieuAIVip2026"
 
 -- XÓA UI CŨ NẾU CÓ TRÁNH LỖI ĐÈ GIAO DIỆN
@@ -19,7 +19,7 @@ if CoreGui:FindFirstChild("GaGauGroqV6_1") then
     CoreGui.GaGauGroqV6_1:Destroy() 
 end
 
--- TẠO GIAO DIỆN NGƯỜI DÙNG CYBERPUNK DASHBOARD (GIỮ NGUYÊN)
+-- TẠO GIAO DIỆN NGƯỜI DÙNG CYBERPUNK DASHBOARD
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "GaGauGroqV6_1"
 ScreenGui.ResetOnSpawn = false
@@ -98,7 +98,7 @@ local AdviceCorner = Instance.new("UICorner")
 AdviceCorner.CornerRadius = UDim.new(0, 8)
 AdviceCorner.Parent = AdviceLabel
 
--- HỆ THỐNG KÉO THẢ GIAO DIỆN TRÊN ĐIỆN THOẠI (GIỮ NGUYÊN)
+-- HỆ THỐNG KÉO THẢ GIAO DIỆN TRÊN ĐIỆN THOẠI
 local dragging, dragInput, dragStart, startPos
 local function update(input)
     local delta = input.Position - dragStart
@@ -114,7 +114,7 @@ end)
 MainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
 
--- CHUYỂN DỮ LIỆU CẦU VÀ NHẬN KẾT QUẢ AI TỪ TERMUX VIA REQUESTASYNC (GIỮ NGUYÊN)
+-- CHUYỂN DỮ LIỆU CẦU VÀ NHẬN KẾT QUẢ AI TỪ TERMUX VIA REQUESTASYNC
 local function FetchGroqPrediction(historyData)
     local jsonPayload = HttpService:JSONEncode({ history = historyData })
     
@@ -126,8 +126,10 @@ local function FetchGroqPrediction(historyData)
                 Headers = {
                     ["Content-Type"] = "application/json",
                     ["Authorization"] = AI_API_KEY,
+                    -- Thêm Header chặn trang thông báo phiền phức của Localtunnel
                     ["bypass-tunnel-reminder"] = "true", 
-                    ["User-Agent"] = "Roblox/Linux"
+                    ["Bypass-Tunnel-Reminder"] = "1",
+                    ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
                 },
                 Body = jsonPayload
             })
@@ -155,19 +157,17 @@ local function FetchGroqPrediction(historyData)
     end)
 end
 
--- LẮNG NGHE SỰ KIỆN REMOTEEVENT ĐỂ ĐỒNG BỘ LỊCH SỬ PHIÊN (NÂNG CẤP QUÉT TOÀN BỘ CẦU)
+-- LẮNG NGHE SỰ KIỆN REMOTEEVENT ĐỂ ĐỒNG BỘ LỊCH SỬ PHIÊN
 GaGauUpdate.OnClientEvent:Connect(function(method, ...)
     local args = { ... }
     if method == "SyncState" and args[1] then
         local fullHistory = {}
         
-        -- Nâng cấp: Quét sâu lôi toàn bộ lịch sử từ lúc tạo server nếu có mục lưu trữ đầy đủ hơn
         if args[1].FullHistory then
             fullHistory = args[1].FullHistory
         elseif args[1].history then
             fullHistory = args[1].history
         else
-            -- Tự động quét tìm kiếm mảng dữ liệu cầu trong table gốc của game
             for _, v in pairs(args[1]) do
                 if type(v) == "table" and (#v > 0) and (v[1] == "Ga" or v[1] == "Gau") then
                     fullHistory = v
@@ -176,7 +176,6 @@ GaGauUpdate.OnClientEvent:Connect(function(method, ...)
             end
         end
         
-        -- Gửi mảng cầu đã quét được đi phân tích
         FetchGroqPrediction(fullHistory)
     end
     
@@ -186,7 +185,5 @@ GaGauUpdate.OnClientEvent:Connect(function(method, ...)
     end
 end)
 
--- Gửi tín hiệu kích hoạt đồng bộ ngay khi chạy script
 GaGauUpdate:FireServer("RequestSync")
 print("[Hac Trieu Groq V6.1 Nâng Cấp]: Khởi chạy Script game hoàn tất!")
-
