@@ -8,8 +8,8 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local GaGauUpdate = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("GaGauUpdate")
 
--- ĐƯỜNG DẪN ĐẾN FILE PYTHON TRÊN TERMUX CỦA BẠN
-local AI_SERVER_URL = "https://ninety-insects-beg.loca.lt" 
+-- ĐƯỜNG DẪN ĐẾN FILE PYTHON TRÊN TERMUX (ĐÃ FIX BỎ /PREDICT ĐỂ HẾT LỖI 404)
+local AI_SERVER_URL = "https://ninety-insects-beg.loca.lt/" 
 local AI_API_KEY = "HacTrieuAIVip2026"
 
 -- ĐƯỜNG DẪN UI GỐC CỦA GAME (Dựa theo code decompile bạn gửi)
@@ -65,7 +65,7 @@ local function GetCurrentHistoryFromUI()
     return historyList
 end
 
--- KHỞI TẠO MENU THÔNG BÁO RIÊNG CỦA BOT HẮC TRIỀU
+-- KHỞI TẠO MENU THÔNG BÁO RIÊNG CỦA BOT HẮC TRIỀU (ĐÃ ĐỔI TÊN THÀNH AI ĐÁNH GÀ GẤU)
 if CoreGui:FindFirstChild("HacTrieuFinancialBotV2") then CoreGui.HacTrieuFinancialBotV2:Destroy() end
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "HacTrieuFinancialBotV2"
@@ -82,16 +82,16 @@ UICorner.CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "⚡ HẮC TRIỀU AUTOMATION BET SYSTEM"
+Title.Text = "⚡ AI ĐÁNH GÀ GẤU" -- Đã cập nhật tên theo yêu cầu
 Title.TextColor3 = Color3.fromRGB(0, 255, 153)
 Title.BackgroundColor3 = Color3.fromRGB(20, 28, 45)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 11
+Title.TextSize = 12
 
 local LogLabel = Instance.new("TextLabel", MainFrame)
 LogLabel.Size = UDim2.new(1, -20, 0, 80)
 LogLabel.Position = UDim2.new(0, 10, 0, 35)
-LogLabel.Text = "🔄 Đang quét sàn đấu và chờ chu kỳ đếm ngược của game..."
+LogLabel.Text = "🔄 Đang kết nối server Termux và đợi phiên mới..."
 LogLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 LogLabel.TextWrapped = true
 LogLabel.Font = Enum.Font.Gotham
@@ -99,7 +99,7 @@ LogLabel.TextXAlignment = Enum.TextXAlignment.Left
 LogLabel.TextYAlignment = Enum.TextYAlignment.Top
 LogLabel.BackgroundTransparency = 1
 
--- HÀM GỬI DATA CHO AI VÀ TỰ ĐỘNG ĐẶT TIỀN QUẢ N LÝ VỐN
+-- HÀM GỬI DATA CHO AI VÀ TỰ ĐỘNG ĐẶT TIỀN QUẢN LÝ VỐN
 local function ProcessAIExecution()
     if IsPlacedThisRound then return end
     IsPlacedThisRound = true
@@ -135,7 +135,7 @@ local function ProcessAIExecution()
                 local ai_target = data.predict      -- Cửa AI chọn: "Ga" hoặc "Gau"
                 local ai_bet = tonumber(data.bet_amount) or 10 -- Số tiền cược AI ra lệnh
                 
-                LogLabel.Text = string.format("💰 Vốn quét được: %d xu\n💬 %s\n➡️ LỆNH: Tự động đặt %d xu vào [%s]", currentBalance, data.advice, ai_bet, ai_target)
+                LogLabel.Text = string.format("💰 Vốn quét: %d xu\n💬 %s\n➡️ LỆNH: Tự động đặt %d xu vào [%s]", currentBalance, data.advice, ai_bet, ai_target)
                 
                 -- Ghi nhớ dữ liệu phiên này để tính toán thắng thua sau đó
                 LastBetSide = ai_target
@@ -151,7 +151,7 @@ local function ProcessAIExecution()
                 end)
             end
         else
-            LogLabel.Text = "❌ Lỗi kết nối Termux! Hãy bật tab 'lt' và lệnh chạy python trên máy Host."
+            LogLabel.Text = "❌ Lỗi kết nối Termux! Đang thử lại ở chu kỳ sau..."
             IsPlacedThisRound = false
         end
     end)
@@ -213,4 +213,5 @@ end)
 
 -- Gửi lệnh đồng bộ ban đầu để kích hoạt chu kỳ quét ngầm
 GaGauUpdate:FireServer("RequestSync")
-print("[Hắc Triều] Hệ thống Auto-Bet Quản lý tài chính UI V2 đã hoạt động.")
+print("[Hắc Triều] AI ĐÁNH GÀ GẤU đã được kích hoạt thành công!")
+
