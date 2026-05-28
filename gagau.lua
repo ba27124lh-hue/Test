@@ -1,4 +1,4 @@
--- THIẾT LẬP KẾT NỐI HỆ THỐNG
+-- THIẾT LẬP HỆ THỐNG KẾT NỐI
 game:GetService("HttpService").HttpEnabled = true
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,78 +8,112 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local GaGauUpdate = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("GaGauUpdate")
 
--- CẤU HÌNH ĐƯỜNG DẪN KẾT NỐI ĐẾN TERMUX CỦA BẠN
-local AI_SERVER_URL = "https://grumpy-carpets-help.loca.lt/predict" 
+-- ĐƯỜNG DẪN ĐẾN FILE PYTHON TRÊN TERMUX CỦA BẠN
+local AI_SERVER_URL = "https://ninety-insects-beg.loca.lt" 
 local AI_API_KEY = "HacTrieuAIVip2026"
 
--- BIẾN THEO DÕI TRẠNG THÁI TÀI CHÍNH
+-- ĐƯỜNG DẪN UI GỐC CỦA GAME (Dựa theo code decompile bạn gửi)
+local FrameGaGau = LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("GaGauGui"):WaitForChild("FrameGaGau")
+local HistoryFrame = FrameGaGau:WaitForChild("HistoryFrame")
+
+-- BIẾN QUẢN LÝ TRẠNG THÁI
 local LastMatchResult = true
 local LastBetSide = nil
 local LastBetAmount = 0
 local CurrentSession = 0
-local IsWaitingResponse = false
+local IsPlacedThisRound = false
+local FakeHistoryMemory = {} -- Bộ nhớ đệm tự lưu lịch sử cầu nếu game không đồng bộ mảng
 
--- HÀM QUÉT TIỀN TỰ ĐỘNG (Tự động tìm ví tiền của bạn trong Game)
-local function GetCurrentBalance()
+-- HÀM QUÉT SỐ TIỀN TRỰC TIẾP TỪ GIAO DIỆN GAME (UI SCANNER)
+local function GetCurrentBalanceFromUI()
+    -- Thử quét nhãn hiển thị tiền chung trên UI Gà Gấu nếu có
+    local moneyLabel = FrameGaGau:FindFirstChild("MoneyLabel") or FrameGaGau:FindFirstChild("BalanceLabel") or FrameGaGau:FindFirstChild("TokenLabel")
+    if moneyLabel then
+        local cleanNet = moneyLabel.Text:gsub(",", ""):gsub("%$", ""):match("%d+")
+        if cleanNet then return tonumber(cleanNet) end
+    end
+    
+    -- Cách dự phòng 2: Quét từ leaderstats của hệ thống người chơi
     if LocalPlayer then
-        -- 1. Tìm trong bảng điểm chung (Leaderstats)
         local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
         if leaderstats then
             local cash = leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Coins") or leaderstats:FindFirstChild("Money") or leaderstats:FindFirstChild("Xu")
             if cash then return cash.Value end
         end
-        -- 2. Tìm trong Data/PlayerGui (Dự phòng dựa trên các game phổ biến)
-        local data = LocalPlayer:FindFirstChild("Data")
-        if data and data:FindFirstChild("Balance") then return data.Balance.Value end
     end
-    return 100000 -- Trả về số dư giả định nếu game ẩn ví tiền quá sâu để AI tính tỷ lệ %
+    return 50000 -- Số dư mặc định để AI tính toán tỷ lệ % nếu không quét ra UI tiền
 end
 
--- TẠO UI THÔNG BÁO TRẠNG THÁI AUTO-BET TRÊN MÀN HÌNH
-if CoreGui:FindFirstChild("HacTrieuFinancialBot") then CoreGui.HacTrieuFinancialBot:Destroy() end
+-- HÀM QUÉT LỊCH SỬ CẦU TỪ CÁC CHẤM TRÒN TRÊN MÀN HÌNH (HISTORY SCANNER)
+local function GetCurrentHistoryFromUI()
+    local historyList = {}
+    for _, child in ipairs(HistoryFrame:GetChildren()) do
+        if child:IsA("ImageLabel") and child.Name == "HistoryDot" then
+            -- Nhận diện Gà hay Gấu dựa vào ID ảnh gốc của game
+            if child.Image == "rbxassetid://80209267344815" then
+                table.insert(historyList, "Ga")
+            elseif child.Image == "rbxassetid://79945118847683" then
+                table.insert(historyList, "Gau")
+            end
+        end
+    end
+    
+    -- Nếu danh sách UI trống, sử dụng bộ nhớ đệm tự lưu
+    if #historyList == 0 then
+        return FakeHistoryMemory
+    end
+    return historyList
+end
+
+-- KHỞI TẠO MENU THÔNG BÁO RIÊNG CỦA BOT HẮC TRIỀU
+if CoreGui:FindFirstChild("HacTrieuFinancialBotV2") then CoreGui.HacTrieuFinancialBotV2:Destroy() end
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
-ScreenGui.Name = "HacTrieuFinancialBot"
+ScreenGui.Name = "HacTrieuFinancialBotV2"
 
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 320, 0, 110)
-Frame.Position = UDim2.new(0.05, 0, 0.25, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
-Frame.BorderSizePixel = 0
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 330, 0, 120)
+MainFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Bạn có thể kéo menu này di chuyển trên màn hình điện thoại
 
-local UICorner = Instance.new("UICorner", Frame)
+local UICorner = Instance.new("UICorner", MainFrame)
 UICorner.CornerRadius = UDim.new(0, 8)
 
-local TitleLabel = Instance.new("TextLabel", Frame)
-TitleLabel.Size = UDim2.new(1, 0, 0, 30)
-TitleLabel.Text = "🤖 HẮC TRIỀU FINANCIAL AUTO-BET v1.0"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 153)
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.TextSize = 12
-TitleLabel.BackgroundColor3 = Color3.fromRGB(18, 24, 38)
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "⚡ HẮC TRIỀU AUTOMATION BET SYSTEM"
+Title.TextColor3 = Color3.fromRGB(0, 255, 153)
+Title.BackgroundColor3 = Color3.fromRGB(20, 28, 45)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 11
 
-local LogLabel = Instance.new("TextLabel", Frame)
-LogLabel.Size = UDim2.new(1, -20, 0, 70)
+local LogLabel = Instance.new("TextLabel", MainFrame)
+LogLabel.Size = UDim2.new(1, -20, 0, 80)
 LogLabel.Position = UDim2.new(0, 10, 0, 35)
-LogLabel.Text = "Đang đồng bộ dữ liệu phiên và số dư tài khoản..."
-LogLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+LogLabel.Text = "🔄 Đang quét sàn đấu và chờ chu kỳ đếm ngược của game..."
+LogLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 LogLabel.TextWrapped = true
 LogLabel.Font = Enum.Font.Gotham
 LogLabel.TextXAlignment = Enum.TextXAlignment.Left
+LogLabel.TextYAlignment = Enum.TextYAlignment.Top
 LogLabel.BackgroundTransparency = 1
 
--- HÀM XỬ LÝ GỬI THÔNG TIN VÀ TỰ ĐỘNG ĐẶT CƯỢC
-local function RequestAIAndPlaceBet(historyList)
-    if IsWaitingResponse then return end
-    IsWaitingResponse = true
+-- HÀM GỬI DATA CHO AI VÀ TỰ ĐỘNG ĐẶT TIỀN QUẢ N LÝ VỐN
+local function ProcessAIExecution()
+    if IsPlacedThisRound then return end
+    IsPlacedThisRound = true
 
-    local myBalance = GetCurrentBalance()
+    local currentBalance = GetCurrentBalanceFromUI()
+    local currentHistory = GetCurrentHistoryFromUI()
     
-    -- Đóng gói dữ liệu gửi lên Termux
     local payload = HttpService:JSONEncode({
-        history = historyList,
-        balance = myBalance,
+        history = currentHistory,
+        balance = currentBalance,
         last_match_win = LastMatchResult
     })
+    
+    LogLabel.Text = "🧠 AI đang phân tích dòng vốn và thuật toán cầu..."
     
     task.spawn(function()
         local success, response = pcall(function()
@@ -98,76 +132,85 @@ local function RequestAIAndPlaceBet(historyList)
         if success and response.Success then
             local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(response.Body) end)
             if decodeSuccess and data then
-                local target_door = data.predict       -- "Ga" hoặc "Gau"
-                local bet_amount = data.bet_amount    -- Số tiền AI tính toán hoàn vốn/kiếm lời
+                local ai_target = data.predict      -- Cửa AI chọn: "Ga" hoặc "Gau"
+                local ai_bet = tonumber(data.bet_amount) or 10 -- Số tiền cược AI ra lệnh
                 
-                LogLabel.Text = string.format("Số dư: %d\n%s\n➡️ LỆNH: Đặt %d vào [%s]", myBalance, data.advice, bet_amount, target_door)
+                LogLabel.Text = string.format("💰 Vốn quét được: %d xu\n💬 %s\n➡️ LỆNH: Tự động đặt %d xu vào [%s]", currentBalance, data.advice, ai_bet, ai_target)
                 
-                -- Ghi nhận dữ liệu cược để kiểm tra thắng thua ở ván sau
-                LastBetSide = target_door
-                LastBetAmount = bet_amount
+                -- Ghi nhớ dữ liệu phiên này để tính toán thắng thua sau đó
+                LastBetSide = ai_target
+                LastBetAmount = ai_bet
                 
-                -- THỰC THI LỆNH ĐẶT CƯỢC THEO ĐÚNG CẤU TRÚC CODE GỐC CỦA GAME
+                -- BẮN LỆNH ĐẶT TIỀN THẲNG LÊN SERVER GAME (Sao chép chuẩn từ dòng 301 code gốc)
                 pcall(function()
-                    local betStructure = {
-                        side = target_door,
-                        amount = tonumber(bet_amount)
+                    local betData = {
+                        side = ai_target,
+                        amount = ai_bet
                     }
-                    GaGauUpdate:FireServer("Place", betStructure)
+                    GaGauUpdate:FireServer("Place", betData)
                 end)
             end
         else
-            LogLabel.Text = "❌ Mất kết nối đến Termux! Vui lòng kiểm tra lại tab 'lt' hoặc script python."
+            LogLabel.Text = "❌ Lỗi kết nối Termux! Hãy bật tab 'lt' và lệnh chạy python trên máy Host."
+            IsPlacedThisRound = false
         end
-        IsWaitingResponse = false
     end)
 end
 
--- LẮNG NGHE ĐỒNG BỘ SỰ KIỆN TỪ GAME (Dựa trên Event gốc của trò chơi)
+-- LẮNG NGHE SỰ KIỆN ĐỒNG BỘ ĐỂ KÍCH HOẠT AUTO-BET KHÔNG BỊ TRỄ NHỊP
 GaGauUpdate.OnClientEvent:Connect(function(p1, ...)
-    local t = { ... }
+    local args = { ... }
     
-    -- Trường hợp 1: Đồng bộ trạng thái toàn cục khi vừa vào game
-    if p1 == "SyncState" and t[1] then
-        CurrentSession = t[1].sessionNumber or 0
-        if t[1].phase == "countdown" and t[1].phaseTimeLeft and t[1].phaseTimeLeft > 15 then
-            RequestAIAndPlaceBet(t[1].history or {})
+    -- Khi game gửi trạng thái đồng bộ ban đầu
+    if p1 == "SyncState" and args[1] then
+        CurrentSession = args[1].sessionNumber or 0
+        if args[1].phase == "countdown" and args[1].phaseTimeLeft and args[1].phaseTimeLeft > 15 then
+            ProcessAIExecution()
         end
     end
     
-    -- Trường hợp 2: Khi game bắt đầu đếm ngược phiên mới (Thời gian tốt nhất để đặt cược)
+    -- Khi game đang đếm ngược (Thời gian vàng để đặt tiền)
     if p1 == "Countdown" then
-        local timeLeft = t[1]
-        -- Chỉ ra lệnh đặt khi thời gian còn nhiều (ví dụ từ giây thứ 55 đến giây thứ 15), né 10 giây cuối bị khóa cược (Dòng 193 code gốc)
-        if timeLeft <= 55 and timeLeft >= 15 and not IsWaitingResponse then
-            -- Gọi SyncState tạm thời để lấy mảng lịch sử cầu chính xác nhất
-            GaGauUpdate:FireServer("RequestSync")
+        local timeLeft = args[1] or 0
+        -- Kích hoạt lệnh đặt tiền từ giây thứ 50 đến giây thứ 20 (Tránh vùng 10 giây cuối bị khóa cược)
+        if timeLeft <= 50 and timeLeft >= 20 and not IsPlacedThisRound then
+            ProcessAIExecution()
+        end
+        
+        -- Reset trạng thái khi bắt đầu phiên hoàn toàn mới (giây thứ 60)
+        if timeLeft == 60 then
+            IsPlacedThisRound = false
         end
     end
     
-    -- Trường hợp 3: Khi game trả kết quả (Xử lý tính toán thắng thua để tính tiền vòng sau)
+    -- Khi game công bố kết quả xúc xắc (Xử lý tính toán lời/lỗ để gấp thếp vòng sau)
     if p1 == "Result" then
-        local currentWinner = t[1] -- "Ga" hoặc "Gau"
-        CurrentSession = t[3] or (CurrentSession + 1)
+        local winningDoor = args[1] -- "Ga" hoặc "Gau"
+        CurrentSession = args[3] or (CurrentSession + 1)
+        
+        -- Thêm vào bộ nhớ đệm lịch sử
+        table.insert(FakeHistoryMemory, winningDoor)
+        if #FakeHistoryMemory > 10 then table.remove(FakeHistoryMemory, 1) end
         
         if LastBetSide ~= nil then
-            if LastBetSide == currentWinner then
+            if LastBetSide == winningDoor then
                 LastMatchResult = true
-                LogLabel.Text = string.format("🎉 Phiên #%06d THẮNG! +%d xu. Đang đợi phiên mới...", CurrentSession, LastBetAmount)
+                LogLabel.Text = string.format("🎉 PHIÊN #%06d THẮNG!\nNhận về: +%d xu.\nĐang chuẩn bị vòng tiếp theo...", CurrentSession, LastBetAmount)
             else
                 LastMatchResult = false
-                LogLabel.Text = string.format("😭 Phiên #%06d THUA! -%d xu. AI đang tính toán lệnh gấp thếp hoàn vốn...", CurrentSession, LastBetAmount)
+                LogLabel.Text = string.format("😭 PHIÊN #%06d THUA!\nThất thoát: -%d xu.\nAI đang lên kế hoạch đi tiền hoàn vốn...", CurrentSession, LastBetAmount)
             end
         else
-            LogLabel.Text = string.format("Phiên #%06d Kết quả: [%s]. Đang đợi phiên mới...", CurrentSession, currentWinner)
+            LogLabel.Text = string.format("Phiên #%06d kết thúc. Kết quả: [%s]\nĐang chờ phiên mới mở...", CurrentSession, winningDoor)
         end
         
-        -- Reset trạng thái cược của phiên cũ
+        -- Xóa dữ liệu cược cũ để chuẩn bị cho chu kỳ mới
         LastBetSide = nil
         LastBetAmount = 0
+        IsPlacedThisRound = false
     end
 end)
 
--- Kích hoạt đồng bộ ban đầu
+-- Gửi lệnh đồng bộ ban đầu để kích hoạt chu kỳ quét ngầm
 GaGauUpdate:FireServer("RequestSync")
-print("[Hắc Triều] Hệ thống Auto-Bet quản lý vốn thông minh đã sẵn sàng!")
+print("[Hắc Triều] Hệ thống Auto-Bet Quản lý tài chính UI V2 đã hoạt động.")
