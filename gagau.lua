@@ -11,7 +11,7 @@ local TweenService = game:GetService("TweenService")
 local GaGauUpdate = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("GaGauUpdate")
 
 -- ĐƯỜNG TRUYỀN LOCALTUNNEL TERMUX MỚI CỦA BẠN (ĐÃ CẬP NHẬT CHUẨN)
-local AI_SERVER_URL = "https://grumpy-carpets-help.loca.lt/predict" 
+local AI_SERVER_URL = "https://ninety-insects-beg.loca.lt/predict" 
 local AI_API_KEY = "HacTrieuAIVip2026"
 
 -- XÓA UI CŨ NẾU CÓ TRÁNH LỖI ĐÈ GIAO DIỆN
