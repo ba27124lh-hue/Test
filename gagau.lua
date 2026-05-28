@@ -9,7 +9,7 @@ local LocalPlayer = Players.LocalPlayer
 local GaGauUpdate = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("GaGauUpdate")
 
 -- ĐƯỜNG DẪN KẾT NỐI ĐÃ ĐỒNG BỘ ĐƯỜNG DẪN GỐC VỚI TERMUX
-local AI_SERVER_URL = "[https://ninety-insects-beg.loca.lt/](https://ninety-insects-beg.loca.lt/)" 
+local AI_SERVER_URL = "https://ninety-insects-beg.loca.lt/" 
 local AI_API_KEY = "HacTrieuAIVip2026"
 
 -- KHAI BÁO UI TỪ BẢN DECOMPILE CỦA BẠN
@@ -24,20 +24,18 @@ local CurrentSession = 0
 local IsPlacedThisRound = false
 local FakeHistoryMemory = {} 
 
--- HÀM SỬA ĐỔI: QUÉT CHÍNH XÁC TIỀN "VND" TRONG BẢNG XẾP HẠNG LEADERSTATS
+-- HÀM QUÉT CHÍNH XÁC TIỀN "VND" TRONG BẢNG XẾP HẠNG LEADERSTATS
 local function GetCurrentBalanceFromUI()
     if LocalPlayer then
-        -- Truy quét vào thư mục chứa dữ liệu bảng xếp hạng của Script game
         local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
         if leaderstats then
-            -- Tìm kiếm chính xác giá trị có tên định dạng là "VND"
             local vndMoney = leaderstats:FindFirstChild("VND")
             if vndMoney then 
                 return tonumber(vndMoney.Value) 
             end
         end
     end
-    return 100000000 -- Số dư dự phòng 100M nếu hệ thống phản hồi chậm để AI giữ nguyên tỷ lệ chia tiền
+    return 100000000 -- Số dư dự phòng 100M
 end
 
 -- HÀM THU THẬP CHUỖI CẦU HIỆN TẠI TỪ CÁC CHẤM TRÒN TRÊN SÀN GAME
@@ -107,6 +105,7 @@ local function ProcessAIExecution()
     LogLabel.Text = "🧠 AI đang phân tích dòng tiền VIP và tính toán độ tự tin..."
     
     task.spawn(function()
+        -- FIX MẤU CHỐT: Sử dụng cấu trúc RequestAsync chuẩn mã hóa cao để phá vỡ tường lửa Localtunnel
         local success, response = pcall(function()
             return HttpService:RequestAsync({
                 Url = AI_SERVER_URL,
@@ -114,7 +113,8 @@ local function ProcessAIExecution()
                 Headers = {
                     ["Content-Type"] = "application/json",
                     ["Authorization"] = AI_API_KEY,
-                    ["bypass-tunnel-reminder"] = "true"
+                    ["bypass-tunnel-reminder"] = "true", -- Ép Localtunnel mở cổng cho script game
+                    ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -- Giả lập trình duyệt Chrome
                 },
                 Body = payload
             })
@@ -139,9 +139,12 @@ local function ProcessAIExecution()
                     }
                     GaGauUpdate:FireServer("Place", betData)
                 end)
+            else
+                LogLabel.Text = "❌ Không thể giải mã dữ liệu trả về từ Termux!"
+                IsPlacedThisRound = false
             end
         else
-            LogLabel.Text = "❌ Lỗi kết nối! Đang đợi chu kỳ đếm ngược tiếp theo để lấy lại link..."
+            LogLabel.Text = "❌ Tường lửa chặn kết nối! Hệ thống tự động quét lại sau vài giây..."
             IsPlacedThisRound = false
         end
     end)
@@ -160,7 +163,8 @@ GaGauUpdate.OnClientEvent:Connect(function(p1, ...)
     
     if p1 == "Countdown" then
         local timeLeft = args[1] or 0
-        if timeLeft <= 50 and timeLeft >= 20 and not IsPlacedThisRound then
+        -- Quét liên tục ở các khung giây để chống lỗi hụt kết nối
+        if timeLeft <= 50 and timeLeft >= 15 and not IsPlacedThisRound then
             ProcessAIExecution()
         end
         if timeLeft == 60 then
@@ -178,13 +182,13 @@ GaGauUpdate.OnClientEvent:Connect(function(p1, ...)
         if LastBetSide ~= nil then
             if LastBetSide == winningDoor then
                 LastMatchResult = true
-                LogLabel.Text = string.format("🎉 PHIÊN #%06d THẮNG!\nThu về lời lớn: +%d VND.\nTiếp tục phân tích...", CurrentSession, LastBetAmount)
+                LogLabel.Text = string.format("🎉 PHIÊN #%06d THẮNG!\nThu về lời lớn: +%d VND.", CurrentSession, LastBetAmount)
             else
                 LastMatchResult = false
-                LogLabel.Text = string.format("😭 PHIÊN #%06d CHƯA ĂN!\nTổn thất: -%d VND.\nAI đang kích hoạt cấu trúc bảo toàn vốn...", CurrentSession, LastBetAmount)
+                LogLabel.Text = string.format("😭 PHIÊN #%06d CHƯA ĂN!\nTổn thất: -%d VND.", CurrentSession, LastBetAmount)
             end
         else
-            LogLabel.Text = string.format("Phiên #%06d kết thúc. Kết quả: [%s]\nĐang chờ vòng cược mới mở ra...", CurrentSession, winningDoor)
+            LogLabel.Text = string.format("Phiên #%06d kết thúc. Kết quả: [%s]", CurrentSession, winningDoor)
         end
         
         LastBetSide = nil
@@ -194,4 +198,5 @@ GaGauUpdate.OnClientEvent:Connect(function(p1, ...)
 end)
 
 GaGauUpdate:FireServer("RequestSync")
-print("[Hắc Triều] Chế độ AI ĐÁNH GÀ GẤU - Whale Mode (Lệnh Lớn) đã chạy!")
+print("[Hắc Triều] Đã nạp bản vá chống chặn đường truyền VIP!")
+
