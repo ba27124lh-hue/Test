@@ -9,7 +9,7 @@ local LocalPlayer = Players.LocalPlayer
 local GaGauUpdate = ReplicatedStorage:WaitForChild("Remote"):WaitForChild("GaGauUpdate")
 
 -- ĐƯỜNG DẪN KẾT NỐI ĐÃ ĐỒNG BỘ ĐƯỜNG DẪN GỐC VỚI TERMUX
-local AI_SERVER_URL = "https://ninety-insects-beg.loca.lt/" 
+local AI_SERVER_URL = "https://curly-walls-wash.loca.lt/" 
 local AI_API_KEY = "HacTrieuAIVip2026"
 
 -- KHAI BÁO UI TỪ BẢN DECOMPILE CỦA BẠN
